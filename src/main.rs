@@ -15,7 +15,7 @@ use stm32f3xx_hal_v2::{self as hal, pac, prelude::*, i2c::Error};
 
 const VALID_ADDR_RANGE: Range<u8> = 0x40..0x55;
 const MEMORY_ADDRESS: u16 = 0x0000; // Address to write/read data to/from
-const DEVICE_ADDRESS: u8 = 0x50; // I2C device address
+const MEMORY_ADDRESS_2: u16 = 0x0001; // Address to write/read data to/from
 
 
 fn check_i2c_error(error: Error) -> Result<(), ()> {
@@ -82,15 +82,27 @@ fn main() -> ! {
     }
      // Read data from the memory location
      let memory_address_bytes = [(MEMORY_ADDRESS >> 8) as u8, MEMORY_ADDRESS as u8];
-     let value = 0xAC;
+     let value = 0x0C;
      let buff = [
         ((MEMORY_ADDRESS >> 8) & 0xFF) as u8,
         (MEMORY_ADDRESS & 0xFF) as u8,
         value
     ];
 
+
+
     // Write the buffer to the I2C device
     i2c.write(fram_address, &buff).unwrap();
+
+    let value = 0x0A;
+    let buff = [
+       ((MEMORY_ADDRESS_2 >> 8) & 0xFF) as u8,
+       (MEMORY_ADDRESS_2 & 0xFF) as u8,
+       value
+   ];
+
+   i2c.write(fram_address, &buff).unwrap();
+
 
     let mut data = [0;100];
     i2c.write_read(fram_address, &memory_address_bytes, &mut data).unwrap();
