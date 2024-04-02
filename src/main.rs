@@ -82,6 +82,15 @@ fn main() -> ! {
     }
      // Read data from the memory location
      let memory_address_bytes = [(MEMORY_ADDRESS >> 8) as u8, MEMORY_ADDRESS as u8];
+     let value = 0xAC;
+     let buff = [
+        ((MEMORY_ADDRESS >> 8) & 0xFF) as u8,
+        (MEMORY_ADDRESS & 0xFF) as u8,
+        value
+    ];
+
+    // Write the buffer to the I2C device
+    i2c.write(fram_address, &buff).unwrap();
 
     let mut data = [0;100];
     i2c.write_read(fram_address, &memory_address_bytes, &mut data).unwrap();
