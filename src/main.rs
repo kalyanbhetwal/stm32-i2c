@@ -9,6 +9,7 @@
 #![allow(non_upper_case_globals)]
 
 use core::mem;
+use core::ptr;
 use panic_halt as _;
 use core::ops::Range;
 use cortex_m_rt::entry;
@@ -26,13 +27,32 @@ const FRAM_ADDRESS:u8 = 0x50;
 
 
 const back_up_address: u16 = 0x0100;
-static mut x:i8 = 12;
+static mut x:i8 = 14;
 
 
 const CLOCK_FREQUENCY: u32 = 8_000_000; // Clock frequency in Hz
 
+fn restore_globals<T>(i2c: &mut hal::i2c::I2c<pac::I2C1, (stm32f3xx_hal_v2::gpio::gpiob::PB8<hal::gpio::AF4>, stm32f3xx_hal_v2::gpio::gpiob::PB9<hal::gpio::AF4>)>, adrs: *const T, len: usize) {
+unsafe {
+    x  = 6;
+    let mut data = [0u8; 20];
+    i2c.write_read(FRAM_ADDRESS, &[(back_up_address >> 8) as u8, back_up_address as u8], &mut data).unwrap();
+    
+    let dp = adrs as *mut u8;
+    ptr::copy_nonoverlapping(data.as_ptr(), dp, len);
+
+    // for i in 0..len{
+    //     let byte_ptr = adrs as *const u8;
+    //      *(byte_ptr.add(i)) = data[i];
+    //  }
+    
+    //back_up_address= back_up_address +len as u16;
+    }
+}
+
 fn checkpoint_globals<T>(i2c: &mut hal::i2c::I2c<pac::I2C1, (stm32f3xx_hal_v2::gpio::gpiob::PB8<hal::gpio::AF4>, stm32f3xx_hal_v2::gpio::gpiob::PB9<hal::gpio::AF4>)>, adrs: *const T, len: usize) {
     unsafe {
+        x = 93;
     let mut buff = [0;100];
     buff[0]= ((back_up_address >> 8) & 0xFF) as u8;
     buff[1] = (back_up_address & 0xFF) as u8;
@@ -85,6 +105,7 @@ fn main() -> ! {
 
     unsafe{
         checkpoint_globals(&mut i2c, &x as *const i8, mem::size_of_val(&x));
+        restore_globals(&mut i2c, &x as *const i8, mem::size_of_val(&x));
     }
 
     let value = 0x0C;
@@ -135,6 +156,10 @@ fn main() -> ! {
 
     hprintln!("Read time: {} ms", read_time).unwrap();
     hprintln!("Data read: {:?}", data).unwrap();
+
+    unsafe{
+        hprintln!("the value of x after everthing {}",x).unwrap();
+    }
     //{
     //     Ok(()) => {
     //         //let data =  data[0];
