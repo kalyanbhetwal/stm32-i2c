@@ -5,11 +5,14 @@
 
 #![no_std]
 #![no_main]
+#![allow(dead_code)]
+#![allow(non_upper_case_globals)]
 
+use core::mem;
 use panic_halt as _;
 use core::ops::Range;
 use cortex_m_rt::entry;
-use cortex_m_semihosting::{hprint, hprintln};
+use cortex_m_semihosting::hprintln;
 
 use cortex_m::peripheral::{Peripherals, DWT};
 
@@ -18,9 +21,30 @@ use stm32f3xx_hal_v2::{self as hal, pac, prelude::*};
 const VALID_ADDR_RANGE: Range<u8> = 0x40..0x55;
 const MEMORY_ADDRESS: u16 = 0x0000; // Address to write/read data to/from
 const MEMORY_ADDRESS_2: u16 = 0x0001; // Address to write/read data to/from
+const FRAM_ADDRESS:u8 = 0x50;
+
+
+
+const back_up_address: u16 = 0x0100;
+static mut x:i8 = 12;
+
 
 const CLOCK_FREQUENCY: u32 = 8_000_000; // Clock frequency in Hz
 
+fn checkpoint_globals<T>(i2c: &mut hal::i2c::I2c<pac::I2C1, (stm32f3xx_hal_v2::gpio::gpiob::PB8<hal::gpio::AF4>, stm32f3xx_hal_v2::gpio::gpiob::PB9<hal::gpio::AF4>)>, adrs: *const T, len: usize) {
+    unsafe {
+    let mut buff = [0;100];
+    buff[0]= ((back_up_address >> 8) & 0xFF) as u8;
+    buff[1] = (back_up_address & 0xFF) as u8;
+    
+    for i in 0..len{
+       let byte_ptr = adrs as *const u8;
+       buff[i+2] =  *byte_ptr.add(i);
+    }
+    i2c.write(FRAM_ADDRESS, &buff).unwrap();
+    //back_up_address= back_up_address +len as u16;
+    }
+}
 
 #[entry]
 fn main() -> ! {
@@ -59,6 +83,9 @@ fn main() -> ! {
     //     }
     // }
 
+    unsafe{
+        checkpoint_globals(&mut i2c, &x as *const i8, mem::size_of_val(&x));
+    }
 
     let value = 0x0C;
      let buff = [
@@ -75,11 +102,11 @@ fn main() -> ! {
 
    hprintln!("Write time: {} ms", write_time).unwrap();
 
-    let value = 0x0A;
+   // let value = 0x0A;
     let buff = [
        ((MEMORY_ADDRESS_2 >> 8) & 0xFF) as u8,
        (MEMORY_ADDRESS_2 & 0xFF) as u8,
-       value
+       4, 6,9,20,10
    ];
 
    let start_write = DWT::cycle_count();
@@ -90,7 +117,7 @@ fn main() -> ! {
    hprintln!("Write time: {} ms", write_time).unwrap();
 
 
-   let mut data = [0;1];
+   let mut data = [0;10];
    let memory_address_bytes = [(MEMORY_ADDRESS >> 8) as u8, MEMORY_ADDRESS as u8];
    let start_read = DWT::cycle_count();
    i2c.write_read(fram_address, &memory_address_bytes, &mut data).unwrap();
@@ -100,7 +127,7 @@ fn main() -> ! {
    hprintln!("Data read: {:?}", data).unwrap();
 
    let mut data = [0;1];
-   let memory_address_bytes = [(MEMORY_ADDRESS_2 >> 8) as u8, MEMORY_ADDRESS_2 as u8];
+   let memory_address_bytes = [(back_up_address >> 8) as u8, back_up_address as u8];
    let start_read = DWT::cycle_count();
    i2c.write_read(fram_address, &memory_address_bytes, &mut data).unwrap();
    let end_read = DWT::cycle_count();
